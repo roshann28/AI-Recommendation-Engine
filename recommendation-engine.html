@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Match Engine — Preference-Based Recommender</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#0c1420;
+    --panel:#131e2b;
+    --panel-2:#182636;
+    --line:#233348;
+    --text:#e7eef4;
+    --muted:#7c93a6;
+    --cyan:#5eead4;
+    --amber:#f5a623;
+    --amber-dim:#f5a62333;
+    --cyan-dim:#5eead422;
+    --radius:10px;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{
+    background:
+      radial-gradient(circle at 15% -10%, #1a2c3f 0%, transparent 45%),
+      radial-gradient(circle at 100% 10%, #142230 0%, transparent 40%),
+      var(--ink);
+    color:var(--text);
+    font-family:'Inter', sans-serif;
+    min-height:100vh;
+    padding:40px 20px 80px;
+  }
+  .wrap{max-width:920px; margin:0 auto;}
+
+  /* Header */
+  header{margin-bottom:44px;}
+  .eyebrow{
+    font-family:'JetBrains Mono', monospace;
+    font-size:12px;
+    letter-spacing:0.18em;
+    color:var(--cyan);
+    text-transform:uppercase;
+    display:flex; align-items:center; gap:10px;
+    margin-bottom:14px;
+  }
+  .eyebrow::before{
+    content:"";
+    width:7px; height:7px; border-radius:50%;
+    background:var(--cyan);
+    box-shadow:0 0 8px var(--cyan);
+  }
+  h1{
+    font-family:'Space Grotesk', sans-serif;
+    font-weight:700;
+    font-size:clamp(28px, 4.5vw, 42px);
+    line-height:1.1;
+    letter-spacing:-0.01em;
+  }
+  h1 span{color:var(--cyan);}
+  .sub{
+    color:var(--muted);
+    font-size:15px;
+    margin-top:12px;
+    max-width:560px;
+    line-height:1.5;
+  }
+
+  /* Panel */
+  .panel{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    padding:28px;
+    margin-bottom:24px;
+  }
+  .panel-label{
+    font-family:'JetBrains Mono', monospace;
+    font-size:11px;
+    letter-spacing:0.14em;
+    text-transform:uppercase;
+    color:var(--muted);
+    display:flex;
+    align-items:center;
+    gap:8px;
+    margin-bottom:18px;
+  }
+  .panel-label .num{
+    color:var(--amber);
+    font-weight:700;
+  }
+
+  /* Tag chips */
+  .chip-grid{
+    display:flex;
+    flex-wrap:wrap;
+    gap:10px;
+  }
+  .chip{
+    font-family:'JetBrains Mono', monospace;
+    font-size:13px;
+    padding:9px 16px;
+    border-radius:100px;
+    border:1px solid var(--line);
+    background:var(--panel-2);
+    color:var(--muted);
+    cursor:pointer;
+    transition:all 0.15s ease;
+    user-select:none;
+  }
+  .chip:hover{border-color:var(--cyan); color:var(--text);}
+  .chip.active{
+    background:var(--cyan-dim);
+    border-color:var(--cyan);
+    color:var(--cyan);
+    box-shadow:inset 0 0 0 1px var(--cyan);
+  }
+
+  .row-between{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:16px;
+    margin-top:24px;
+    flex-wrap:wrap;
+  }
+  .selected-count{
+    font-family:'JetBrains Mono', monospace;
+    font-size:12px;
+    color:var(--muted);
+  }
+  .selected-count b{color:var(--cyan);}
+
+  button.run{
+    font-family:'Space Grotesk', sans-serif;
+    font-weight:600;
+    font-size:14px;
+    background:var(--cyan);
+    color:#08161a;
+    border:none;
+    padding:13px 26px;
+    border-radius:8px;
+    cursor:pointer;
+    transition:transform 0.12s ease, box-shadow 0.12s ease;
+    letter-spacing:0.01em;
+  }
+  button.run:hover{transform:translateY(-1px); box-shadow:0 6px 20px -6px var(--cyan);}
+  button.run:disabled{
+    background:var(--panel-2);
+    color:var(--muted);
+    cursor:not-allowed;
+    box-shadow:none;
+    transform:none;
+  }
+
+  /* Logic trace */
+  .trace{
+    font-family:'JetBrains Mono', monospace;
+    font-size:12px;
+    color:var(--muted);
+    background:var(--panel-2);
+    border:1px solid var(--line);
+    border-radius:8px;
+    padding:16px 18px;
+    margin-top:20px;
+    line-height:1.8;
+    display:none;
+  }
+  .trace.show{display:block;}
+  .trace .k{color:var(--amber);}
+
+  /* Results */
+  #results{display:none;}
+  #results.show{display:block;}
+  .results-head{
+    display:flex;
+    align-items:baseline;
+    justify-content:space-between;
+    margin-bottom:18px;
+    flex-wrap:wrap;
+    gap:10px;
+  }
+  .results-head h2{
+    font-family:'Space Grotesk', sans-serif;
+    font-size:20px;
+    font-weight:600;
+  }
+  .results-head .meta{
+    font-family:'JetBrains Mono', monospace;
+    font-size:12px;
+    color:var(--muted);
+  }
+
+  .card{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    padding:20px 22px;
+    margin-bottom:12px;
+    display:grid;
+    grid-template-columns:56px 1fr auto;
+    gap:20px;
+    align-items:center;
+  }
+  .rank{
+    font-family:'JetBrains Mono', monospace;
+    font-size:22px;
+    font-weight:700;
+    color:var(--line);
+    text-align:center;
+  }
+  .card.top .rank{color:var(--amber);}
+  .card-body .title{
+    font-family:'Space Grotesk', sans-serif;
+    font-size:17px;
+    font-weight:600;
+    margin-bottom:6px;
+  }
+  .card-body .title .yr{color:var(--muted); font-weight:400; font-size:14px;}
+  .tagline{
+    color:var(--muted);
+    font-size:13px;
+    margin-bottom:10px;
+    line-height:1.4;
+  }
+  .tag-row{display:flex; flex-wrap:wrap; gap:6px;}
+  .tag-pill{
+    font-family:'JetBrains Mono', monospace;
+    font-size:11px;
+    padding:3px 9px;
+    border-radius:100px;
+    border:1px solid var(--line);
+    color:var(--muted);
+  }
+  .tag-pill.match{
+    border-color:var(--cyan);
+    color:var(--cyan);
+    background:var(--cyan-dim);
+  }
+
+  .score-wrap{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:6px;
+    min-width:70px;
+  }
+  .score-num{
+    font-family:'JetBrains Mono', monospace;
+    font-weight:700;
+    font-size:19px;
+    color:var(--cyan);
+  }
+  .score-bar{
+    width:56px;
+    height:5px;
+    background:var(--line);
+    border-radius:100px;
+    overflow:hidden;
+  }
+  .score-fill{
+    height:100%;
+    background:linear-gradient(90deg, var(--cyan), var(--amber));
+    border-radius:100px;
+    width:0%;
+    transition:width 0.6s cubic-bezier(.2,.8,.2,1);
+  }
+
+  .empty-note{
+    font-family:'JetBrains Mono', monospace;
+    font-size:13px;
+    color:var(--muted);
+    text-align:center;
+    padding:30px 0;
+  }
+
+  footer{
+    margin-top:40px;
+    font-family:'JetBrains Mono', monospace;
+    font-size:11px;
+    color:var(--muted);
+    text-align:center;
+    letter-spacing:0.05em;
+  }
+
+  @media (max-width:560px){
+    .card{grid-template-columns:36px 1fr; }
+    .score-wrap{grid-column:1/-1; flex-direction:row; justify-content:flex-start; margin-top:8px;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="eyebrow">Project 3 — Recommendation Logic</div>
+    <h1>Preference <span>Match Engine</span></h1>
+    <p class="sub">Pick the things you're into. The engine scores every title in the catalog by how much its tags overlap with your picks, using Jaccard similarity — then ranks what's left.</p>
+  </header>
+
+  <div class="panel">
+    <div class="panel-label"><span class="num">01</span> Select your interests</div>
+    <div class="chip-grid" id="chipGrid"></div>
+    <div class="row-between">
+      <div class="selected-count"><b id="countNum">0</b> tags selected</div>
+      <button class="run" id="runBtn" disabled>Run match →</button>
+    </div>
+    <div class="trace" id="trace"></div>
+  </div>
+
+  <div id="results">
+    <div class="results-head">
+      <h2>Recommended for you</h2>
+      <div class="meta" id="resultMeta"></div>
+    </div>
+    <div id="cardList"></div>
+  </div>
+
+</div>
+
+<footer>SIMILARITY(A, B) = |A ∩ B| / |A ∪ B| — CONTENT-BASED FILTERING</footer>
+
+<script>
+// ---------- Dataset ----------
+const CATALOG = [
+  {t:"Signal Loss", y:2019, tags:["sci-fi","thriller","mystery"], line:"A comms officer on a dying satellite decodes a message that shouldn't exist."},
+  {t:"Paper Orbit", y:2021, tags:["drama","romance"], line:"Two rival cartographers fall for each other while mapping a border no one agrees on."},
+  {t:"The Long Static", y:2018, tags:["horror","mystery","thriller"], line:"A rural radio station starts broadcasting things that haven't happened yet."},
+  {t:"Nine Cousins", y:2020, tags:["comedy","drama"], line:"A chaotic family reunion unravels one bad decision at a time."},
+  {t:"Escape Velocity", y:2022, tags:["sci-fi","adventure","action"], line:"A salvage crew races to outrun a collapsing space station."},
+  {t:"Low Tide Society", y:2017, tags:["drama","mystery"], line:"A coastal town's secrets surface after the worst storm in a decade."},
+  {t:"Pixel & Bone", y:2023, tags:["animation","adventure","fantasy"], line:"A stitched-together creature searches for the rest of its parts."},
+  {t:"Redline City", y:2019, tags:["action","thriller"], line:"An ex-courier is pulled back for one last run through a city on lockdown."},
+  {t:"The Quiet Algorithm", y:2021, tags:["sci-fi","drama","mystery"], line:"An engineer discovers her own recommendation system predicting her choices before she makes them."},
+  {t:"Firstlight", y:2020, tags:["fantasy","adventure","romance"], line:"A cartographer's apprentice and a exiled prince chart the last unmapped kingdom."},
+  {t:"Static Bloom", y:2022, tags:["horror","drama"], line:"A gardener inherits a greenhouse that grows something for every grief."},
+  {t:"Docket No. 12", y:2018, tags:["drama","mystery","thriller"], line:"A court clerk uncovers a pattern buried across a decade of case files."},
+  {t:"Comet Season", y:2023, tags:["comedy","romance","sci-fi"], line:"Two strangers keep meeting during meteor showers, and start to suspect why."},
+  {t:"Undertow", y:2016, tags:["action","adventure"], line:"A retired diver is dragged back into the wreck-hunting world for one last score."},
+  {t:"Marrow Deep", y:2021, tags:["horror","thriller"], line:"A mining crew hits something under the permafrost that starts hitting back."},
+  {t:"Glasshouse Waltz", y:2019, tags:["romance","drama"], line:"An architect rebuilds her late partner's unfinished house, and her own life along with it."},
+  {t:"The Cartography of Us", y:2020, tags:["documentary","drama"], line:"A real-time portrait of a family mapping their migration across three continents."},
+  {t:"Nightshift Prophets", y:2022, tags:["comedy","mystery"], line:"Two gas-station clerks accidentally start predicting the future via lottery numbers."},
+  {t:"Ashfall Protocol", y:2018, tags:["action","sci-fi","thriller"], line:"A volcanologist and a soldier race to evacuate a city that refuses to believe them."},
+  {t:"Loose Thread", y:2023, tags:["comedy","drama","romance"], line:"A tailor's shop becomes the unlikely meeting point for a town's worst-kept secrets."},
+  {t:"Deep Field", y:2017, tags:["documentary","sci-fi"], line:"Astronomers chase the faintest galaxy ever recorded, frame by frame, for a decade."},
+  {t:"The Understory", y:2021, tags:["fantasy","drama","adventure"], line:"A forest ranger discovers the woods she's protected her whole life are protecting something back."},
+  {t:"Split Decision", y:2019, tags:["action","comedy"], line:"A washed-up boxer and his estranged daughter train for the same title fight, for different reasons."},
+  {t:"Hollow Choir", y:2020, tags:["horror","fantasy"], line:"A church organist hears a hymn that predates the building by three centuries."}
+];
+
+const ALL_TAGS = [...new Set(CATALOG.flatMap(m => m.tags))].sort();
+
+// ---------- State ----------
+const selected = new Set();
+
+// ---------- Render chips ----------
+const chipGrid = document.getElementById('chipGrid');
+ALL_TAGS.forEach(tag => {
+  const chip = document.createElement('div');
+  chip.className = 'chip';
+  chip.textContent = tag;
+  chip.dataset.tag = tag;
+  chip.addEventListener('click', () => {
+    if(selected.has(tag)){ selected.delete(tag); chip.classList.remove('active'); }
+    else { selected.add(tag); chip.classList.add('active'); }
+    document.getElementById('countNum').textContent = selected.size;
+    document.getElementById('runBtn').disabled = selected.size === 0;
+    document.getElementById('results').classList.remove('show');
+    document.getElementById('trace').classList.remove('show');
+  });
+  chipGrid.appendChild(chip);
+});
+
+// ---------- Jaccard similarity ----------
+function jaccard(setA, arrB){
+  const setB = new Set(arrB);
+  const intersection = [...setA].filter(x => setB.has(x));
+  const unionSize = new Set([...setA, ...setB]).size;
+  return { score: unionSize === 0 ? 0 : intersection.length / unionSize, overlap: intersection };
+}
+
+// ---------- Run matching ----------
+document.getElementById('runBtn').addEventListener('click', () => {
+  const ranked = CATALOG
+    .map(m => {
+      const { score, overlap } = jaccard(selected, m.tags);
+      return { ...m, score, overlap };
+    })
+    .filter(m => m.score > 0)
+    .sort((a,b) => b.score - a.score)
+    .slice(0, 6);
+
+  // logic trace
+  const trace = document.getElementById('trace');
+  trace.innerHTML =
+    `<span class="k">INPUT</span>  preferences = [${[...selected].join(', ')}]<br>` +
+    `<span class="k">SCAN</span>   ${CATALOG.length} titles in catalog<br>` +
+    `<span class="k">SCORE</span>  similarity(prefs, title.tags) for each — Jaccard index<br>` +
+    `<span class="k">FILTER</span> discard score = 0, sort descending<br>` +
+    `<span class="k">OUTPUT</span> top ${ranked.length} match${ranked.length===1?'':'es'} returned`;
+  trace.classList.add('show');
+
+  const list = document.getElementById('cardList');
+  const results = document.getElementById('results');
+  const meta = document.getElementById('resultMeta');
+
+  if(ranked.length === 0){
+    list.innerHTML = `<div class="empty-note">No overlap found in the catalog for that combination — try a different mix.</div>`;
+    meta.textContent = '';
+  } else {
+    meta.textContent = `${ranked.length} matches · sorted by similarity score`;
+    list.innerHTML = ranked.map((m, i) => `
+      <div class="card ${i===0 ? 'top':''}">
+        <div class="rank">${String(i+1).padStart(2,'0')}</div>
+        <div class="card-body">
+          <div class="title">${m.t} <span class="yr">${m.y}</span></div>
+          <div class="tagline">${m.line}</div>
+          <div class="tag-row">
+            ${m.tags.map(t => `<span class="tag-pill ${m.overlap.includes(t) ? 'match':''}">${t}</span>`).join('')}
+          </div>
+        </div>
+        <div class="score-wrap">
+          <div class="score-num">${Math.round(m.score*100)}%</div>
+          <div class="score-bar"><div class="score-fill" data-w="${Math.round(m.score*100)}"></div></div>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  results.classList.add('show');
+  requestAnimationFrame(() => {
+    document.querySelectorAll('.score-fill').forEach(el => {
+      el.style.width = el.dataset.w + '%';
+    });
+  });
+
+  results.scrollIntoView({behavior:'smooth', block:'nearest'});
+});
+</script>
+</body>
+</html>
